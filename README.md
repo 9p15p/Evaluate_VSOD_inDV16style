@@ -7,13 +7,10 @@ Code are reimplemented from the matlab version which are available from http://d
 * GPU implementation with pytorch which can be easier embedding into eval code.
 * One-key evaluation
 
-Usage:
-```
-python main.py --root_dir 'your_dir' --save_dir 'your_dir' --methods 'LWL4vsod' --dataset 'DAVIS2016 DAVSOD'    (if --methods and --dataset is not set, using all methods and datasets.)
-```
+
 **example:**
 ```
-python main.py --method LWL4vsod --dataset DAVIS2016
+python main.py --method LWL4vsod --dataset 'DAVIS2016 DAVSOD' --gt_dir ./gt --pred_dir ./pred --log_dir./
 ```
 example root_dir:
 ```
@@ -28,7 +25,7 @@ example root_dir:
 │   │   │   ├── 0001.png
 │   │   │   └── 0002.png
 └── pred
-│   └── LWL4vosd
+│   └── LWL4vsod
 │   │   ├── DAVIS2016
 │   │   │   ├── bear
 │   │   │   │   ├── 00001.png
