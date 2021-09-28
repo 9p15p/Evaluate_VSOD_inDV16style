@@ -5,6 +5,8 @@ import os.path as osp
 import os
 from evaluator import Eval_thread
 from dataloader import EvalDataset
+
+
 # from concurrent.futures import ThreadPoolExecutor
 def main(cfg):
     root_dir = cfg.root_dir
@@ -22,7 +24,7 @@ def main(cfg):
         dataset_names = os.listdir(gt_dir)
     else:
         dataset_names = cfg.datasets.split(' ')
-    
+
     threads = []
     for dataset in dataset_names:
         for method in method_names:
@@ -31,6 +33,7 @@ def main(cfg):
             threads.append(thread)
     for thread in threads:
         print(thread.run())
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

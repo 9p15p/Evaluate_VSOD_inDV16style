@@ -4,6 +4,8 @@ import time
 import numpy as np
 import torch
 from torchvision import transforms
+from tqdm import tqdm
+import csv
 
 
 class Eval_thread():
@@ -12,21 +14,26 @@ class Eval_thread():
         self.method = method
         self.dataset = dataset
         self.cuda = cuda
-        self.logfile = os.path.join(output_dir, 'result.txt')
+        self.logfile = os.path.join(output_dir, f'{dataset}.csv')
+
     def run(self):
         start_time = time.time()
         mae = self.Eval_mae()
         max_f = self.Eval_fmeasure()
         max_e = self.Eval_Emeasure()
         s = self.Eval_Smeasure()
-        self.LOG('{} dataset with {} method get {:.4f} mae, {:.4f} max-fmeasure, {:.4f} max-Emeasure, {:.4f} S-measure..\n'.format(self.dataset, self.method, mae, max_f, max_e, s))
-        return '[cost:{:.4f}s]{} dataset with {} method get {:.4f} mae, {:.4f} max-fmeasure, {:.4f} max-Emeasure, {:.4f} S-measure..'.format(time.time()-start_time, self.dataset, self.method, mae, max_f, max_e, s)
+        self.LOG(
+            {"Method": self.method, "MAE": mae, "F-Max-measure": max_f, "E-Max-measure": max_e, "S-measure": s}
+        )
+        return '[cost:{:.4f}s]{} dataset with {} method get {:.4f} mae, {:.4f} max-fmeasure, {:.4f} max-Emeasure, {:.4f} S-measure..'.format(
+            time.time() - start_time, self.dataset, self.method, mae, max_f, max_e, s)
+
     def Eval_mae(self):
         print('eval[MAE]:{} dataset with {} method.'.format(self.dataset, self.method))
         avg_mae, img_num = 0.0, 0.0
         with torch.no_grad():
             trans = transforms.Compose([transforms.ToTensor()])
-            for pred, gt in self.loader:
+            for pred, gt in tqdm(self.loader):
                 if self.cuda:
                     pred = trans(pred).cuda()
                     gt = trans(gt).cuda()
@@ -34,12 +41,12 @@ class Eval_thread():
                     pred = trans(pred)
                     gt = trans(gt)
                 mea = torch.abs(pred - gt).mean()
-                if mea == mea: # for Nan
+                if mea == mea:  # for Nan
                     avg_mae += mea
                     img_num += 1.0
             avg_mae /= img_num
             return avg_mae.item()
-    
+
     def Eval_fmeasure(self):
         print('eval[FMeasure]:{} dataset with {} method.'.format(self.dataset, self.method))
         beta2 = 0.3
@@ -47,7 +54,7 @@ class Eval_thread():
 
         with torch.no_grad():
             trans = transforms.Compose([transforms.ToTensor()])
-            for pred, gt in self.loader:
+            for pred, gt in tqdm(self.loader):
                 if self.cuda:
                     pred = trans(pred).cuda()
                     gt = trans(gt).cuda()
@@ -56,11 +63,12 @@ class Eval_thread():
                     gt = trans(gt)
                 prec, recall = self._eval_pr(pred, gt, 255)
                 f_score = (1 + beta2) * prec * recall / (beta2 * prec + recall)
-                f_score[f_score != f_score] = 0 # for Nan
+                f_score[f_score != f_score] = 0  # for Nan
                 avg_f += f_score
                 img_num += 1.0
                 score = avg_f / img_num
             return score.max().item()
+
     def Eval_Emeasure(self):
         print('eval[EMeasure]:{} dataset with {} method.'.format(self.dataset, self.method))
         avg_e, img_num = 0.0, 0.0
@@ -69,7 +77,7 @@ class Eval_thread():
             scores = torch.zeros(255)
             if self.cuda:
                 scores = scores.cuda()
-            for pred, gt in self.loader:
+            for pred, gt in tqdm(self.loader):
                 if self.cuda:
                     pred = trans(pred).cuda()
                     gt = trans(gt).cuda()
@@ -78,15 +86,16 @@ class Eval_thread():
                     gt = trans(gt)
                 scores += self._eval_e(pred, gt, 255)
                 img_num += 1.0
-                
+
             scores /= img_num
             return scores.max().item()
+
     def Eval_Smeasure(self):
         print('eval[SMeasure]:{} dataset with {} method.'.format(self.dataset, self.method))
         alpha, avg_q, img_num = 0.5, 0.0, 0.0
         with torch.no_grad():
             trans = transforms.Compose([transforms.ToTensor()])
-            for pred, gt in self.loader:
+            for pred, gt in tqdm(self.loader):
                 if self.cuda:
                     pred = trans(pred).cuda()
                     gt = trans(gt).cuda()
@@ -101,19 +110,25 @@ class Eval_thread():
                     x = pred.mean()
                     Q = x
                 else:
-                    gt[gt>=0.5] = 1
-                    gt[gt<0.5] = 0
-                    #print(self._S_object(pred, gt), self._S_region(pred, gt))
-                    Q = alpha * self._S_object(pred, gt) + (1-alpha) * self._S_region(pred, gt)
+                    gt[gt >= 0.5] = 1
+                    gt[gt < 0.5] = 0
+                    # print(self._S_object(pred, gt), self._S_region(pred, gt))
+                    Q = alpha * self._S_object(pred, gt) + (1 - alpha) * self._S_region(pred, gt)
                     if Q.item() < 0:
                         Q = torch.FloatTensor([0.0])
                 img_num += 1.0
                 avg_q += Q.item()
             avg_q /= img_num
             return avg_q
+
     def LOG(self, output):
-        with open(self.logfile, 'a') as f:
-            f.write(output)
+        mode = 'a+' if os.path.exists(self.logfile) else 'w'
+        headers = output.keys()
+        with open(self.logfile, mode, encoding='utf-8', newline='') as f:
+            writer = csv.DictWriter(f, headers)
+            if mode == 'w':
+                writer.writeheader()
+            writer.writerow(output)
 
     def _eval_e(self, y_pred, y, num):
         if self.cuda:
@@ -143,14 +158,14 @@ class Eval_thread():
             tp = (y_temp * y).sum()
             prec[i], recall[i] = tp / (y_temp.sum() + 1e-20), tp / (y.sum() + 1e-20)
         return prec, recall
-    
+
     def _S_object(self, pred, gt):
-        fg = torch.where(gt==0, torch.zeros_like(pred), pred)
-        bg = torch.where(gt==1, torch.zeros_like(pred), 1-pred)
+        fg = torch.where(gt == 0, torch.zeros_like(pred), pred)
+        bg = torch.where(gt == 1, torch.zeros_like(pred), 1 - pred)
         o_fg = self._object(fg, gt)
-        o_bg = self._object(bg, 1-gt)
+        o_bg = self._object(bg, 1 - gt)
         u = gt.mean()
-        Q = u * o_fg + (1-u) * o_bg
+        Q = u * o_fg + (1 - u) * o_bg
         return Q
 
     def _object(self, pred, gt):
@@ -158,7 +173,7 @@ class Eval_thread():
         x = temp.mean()
         sigma_x = temp.std()
         score = 2.0 * x / (x * x + 1.0 + sigma_x + 1e-20)
-        
+
         return score
 
     def _S_region(self, pred, gt):
@@ -169,10 +184,10 @@ class Eval_thread():
         Q2 = self._ssim(p2, gt2)
         Q3 = self._ssim(p3, gt3)
         Q4 = self._ssim(p4, gt4)
-        Q = w1*Q1 + w2*Q2 + w3*Q3 + w4*Q4
+        Q = w1 * Q1 + w2 * Q2 + w3 * Q3 + w4 * Q4
         # print(Q)
         return Q
-    
+
     def _centroid(self, gt):
         rows, cols = gt.size()[-2:]
         gt = gt.view(rows, cols)
@@ -186,18 +201,18 @@ class Eval_thread():
         else:
             total = gt.sum()
             if self.cuda:
-                i = torch.from_numpy(np.arange(0,cols)).cuda().float()
-                j = torch.from_numpy(np.arange(0,rows)).cuda().float()
+                i = torch.from_numpy(np.arange(0, cols)).cuda().float()
+                j = torch.from_numpy(np.arange(0, rows)).cuda().float()
             else:
-                i = torch.from_numpy(np.arange(0,cols)).float()
-                j = torch.from_numpy(np.arange(0,rows)).float()
-            X = torch.round((gt.sum(dim=0)*i).sum() / total)
-            Y = torch.round((gt.sum(dim=1)*j).sum() / total)
+                i = torch.from_numpy(np.arange(0, cols)).float()
+                j = torch.from_numpy(np.arange(0, rows)).float()
+            X = torch.round((gt.sum(dim=0) * i).sum() / total)
+            Y = torch.round((gt.sum(dim=1) * j).sum() / total)
         return X.long(), Y.long()
-    
+
     def _divideGT(self, gt, X, Y):
         h, w = gt.size()[-2:]
-        area = h*w
+        area = h * w
         gt = gt.view(h, w)
         LT = gt[:Y, :X]
         RT = gt[:Y, X:w]
@@ -223,15 +238,15 @@ class Eval_thread():
     def _ssim(self, pred, gt):
         gt = gt.float()
         h, w = pred.size()[-2:]
-        N = h*w
+        N = h * w
         x = pred.mean()
         y = gt.mean()
-        sigma_x2 = ((pred - x)*(pred - x)).sum() / (N - 1 + 1e-20)
-        sigma_y2 = ((gt - y)*(gt - y)).sum() / (N - 1 + 1e-20)
-        sigma_xy = ((pred - x)*(gt - y)).sum() / (N - 1 + 1e-20)
-        
-        aplha = 4 * x * y *sigma_xy
-        beta = (x*x + y*y) * (sigma_x2 + sigma_y2)
+        sigma_x2 = ((pred - x) * (pred - x)).sum() / (N - 1 + 1e-20)
+        sigma_y2 = ((gt - y) * (gt - y)).sum() / (N - 1 + 1e-20)
+        sigma_xy = ((pred - x) * (gt - y)).sum() / (N - 1 + 1e-20)
+
+        aplha = 4 * x * y * sigma_xy
+        beta = (x * x + y * y) * (sigma_x2 + sigma_y2)
 
         if aplha != 0:
             Q = aplha / (beta + 1e-20)
@@ -240,3 +255,35 @@ class Eval_thread():
         else:
             Q = 0
         return Q
+
+
+if __name__ == '__main__':
+    pass
+    # [cost:278.0082s]DAVIS2016 dataset with 1_25 method get 0.0203 mae, 0.8465 max-fmeasure, 0.9528 max-Emeasure, 0.8797 S-measure..
+
+    # def writer_csv_demo2():
+    #     headers = ["name", "age", "height"]
+    #     values = [
+    #         {"name": "小王", "age": 18, "height": 178},
+    #         {"name": "小王", "age": 18, "height": 178},
+    #         {"name": "小王", "age": 18, "height": 178}
+    #     ]
+    #     flag = os.path.exists("classromm2.csv")
+    #     with open("classromm2.csv", "a+", encoding="utf-8", newline="") as fp:
+    #         writer = csv.DictWriter(fp, headers)  # 使用csv.DictWriter()方法，需传入两个个参数，第一个为对象，第二个为文件的title
+    #         if not flag:
+    #             writer.writeheader()  # 使用此方法，写入表头
+    #         writer.writerows(values)
+    #
+    # writer_csv_demo2()
+
+    # def LOG(logfile, output):
+    #     mode = 'a+' if os.path.exists(logfile) else 'w'
+    #     headers = output.keys()
+    #     with open(logfile, mode, encoding='utf-8', newline='') as f:
+    #         writer = csv.DictWriter(f, headers)
+    #         if mode == 'w':
+    #             writer.writeheader()
+    #         writer.writerow(output)
+    # output = {"Method": "1_25", "MAE": 0.0203, "F-Max-measure": 0.8465, "E-Max-measure": 0.9528, "S-measure": 0.8797}
+    # LOG('results.csv', output)

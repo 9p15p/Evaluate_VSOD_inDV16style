@@ -9,36 +9,34 @@ Code are reimplemented from the matlab version which are available from http://d
 
 Usage:
 ```
-python main.py --root_dir 'your_dir' --save_dir 'your_dir' --methods 'DSS RAS' --dataset 'ECSSD SOD'    (if --methods and --dataset is not set, using all methods and datasets.)
+python main.py --root_dir 'your_dir' --save_dir 'your_dir' --methods 'LWL4vsod' --dataset 'DAVIS2016 DAVSOD'    (if --methods and --dataset is not set, using all methods and datasets.)
 ```
 **example:**
 ```
-python main.py --root_dir './' --save_dir './'
+python main.py --method LWL4vsod --dataset DAVIS2016
 ```
 example root_dir:
 ```
 .
 ├── gt
-│   ├── ECSSD
-│   │   ├── 0001.png
-│   │   └── 0002.png
-│   ├── PASCAL-S
-│   │   ├── 1.png
-│   │   └── 2.png
-│   └── SOD
-│       ├── 2092.png
-│       └── 3096.png
+│   ├── DAVIS2016
+│   │   ├── bear
+│   │   │   ├── 00001.png
+│   │   │   └── 00002.png
+│   ├── DAVSOD
+│   │   ├── select_0001
+│   │   │   ├── 0001.png
+│   │   │   └── 0002.png
 └── pred
-    └── dss
-        ├── ECSSD
-        │   ├── 0001.png
-        │   └── 0002.png
-        ├── PASCAL-S
-        │   ├── 1.png
-        │   └── 2.png
-        └── SOD
-            ├── 2092.png
-            └── 3096.png
+│   └── LWL4vosd
+│   │   ├── DAVIS2016
+│   │   │   ├── bear
+│   │   │   │   ├── 00001.png
+│   │   │   │   └── 00002.png
+│   │   ├── DAVSOD
+│   │   │   ├── select_0001
+│   │   │   │   ├── 0001.png
+│   │   │   │   └── 0002.png
 ```
 
 
