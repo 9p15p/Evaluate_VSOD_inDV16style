@@ -15,6 +15,7 @@ class EvalDataset(data.Dataset):
                 lst.append(name)
         self.image_path = self.get_paths(lst, img_root)
         self.label_path = self.get_paths(lst, label_root)
+
         # self.image_path = list(map(lambda x: os.path.join(img_root, x), lst))
         # self.label_path = list(map(lambda x: os.path.join(label_root, x), lst))
         # print(self.image_path)
@@ -22,11 +23,22 @@ class EvalDataset(data.Dataset):
 
     def get_paths(self, lst, root):
         v_lst = list(map(lambda x: os.path.join(root, x), lst))
+
+        # # todo:test
+        # if 'pred' in root:
+        #     v_lst = list(map(lambda x: os.path.join(root, x, 'pred'), lst))
+
         f_lst = []
         for v in v_lst:
-            f_lst.extend(
-                sorted([os.path.join(v, f) for f in os.listdir(v)])
-            )
+            if 'pred' in root:
+                f_lst.extend(
+                    sorted([os.path.join(v, f) for f in os.listdir(v)])[1:] # 光流method一般保留第一帧，这里去掉第一帧
+                )
+
+            elif 'gt' in root:
+                f_lst.extend(
+                    sorted([os.path.join(v, f) for f in os.listdir(v)])[1:-1]  # 光流对比，去掉第一帧和最后一帧
+                )
         return f_lst
 
     def __getitem__(self, item):
