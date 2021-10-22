@@ -21,7 +21,9 @@ def main(cfg):
     threads = []
     for dataset in dataset_names:
         for method in method_names:
-            loader = EvalDataset(osp.join(cfg.pred_dir, method, dataset), osp.join(cfg.gt_dir, dataset))
+            loader = EvalDataset(img_root=osp.join(cfg.pred_dir, method, dataset),
+                                 label_root=osp.join(cfg.gt_dir, dataset),
+                                 use_flow=config.use_flow)
             thread = Eval_thread(loader, method, dataset, cfg.log_dir, cfg.cuda)
             threads.append(thread)
     for thread in threads:
@@ -29,12 +31,13 @@ def main(cfg):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="与原版不同，第一帧一直eval，最后一帧若--use_flow则不eval，反之亦然")
     parser.add_argument('--methods', type=str, default=None)
     parser.add_argument('--datasets', type=str, default=None)
     parser.add_argument('--gt_dir', type=str, default='./gt', help='e.g. DAVIS2016的上一层文件夹')
     parser.add_argument('--pred_dir', type=str, default='./pred', help='e.g. LWL4vsod\/DAVIS2016的上一层文件夹')
     parser.add_argument('--log_dir', type=str, default='./', help='保存log的位置')
     parser.add_argument('--cuda', type=bool, default=True)
+    parser.add_argument('--use_flow', type=bool, default=False,help="如果使用光流则在最后一帧GT上不eval")
     config = parser.parse_args()
     main(config)
