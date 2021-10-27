@@ -30,101 +30,86 @@ class Eval_thread():
 
     def Eval_mae(self):
         print('eval[MAE]:{} dataset with {} method.'.format(self.dataset, self.method))
-        avg_mae = 0.0
-        img_num = 0
+        mae_dict = dict()
         with torch.no_grad():
-            trans = transforms.Compose([transforms.ToTensor()])
-            for pred, gt in tqdm(self.loader):
-                if self.cuda:
-                    pred = trans(pred).cuda()
-                    gt = trans(gt).cuda()
-                else:
-                    pred = trans(pred)
-                    gt = trans(gt)
-                mea = torch.abs(pred - gt).mean()
-                if mea == mea:  # for Nan
-                    avg_mae += mea
-                    img_num += 1
-                else:
-                    raise "mea is NaN"
+            for v_name, preds, gts in tqdm(self.loader):
+                preds = preds.cuda() if self.cuda else preds
+                gts = gts.cuda() if self.cuda else gts
 
-            avg_mae /= img_num
-            print(F"avg_mae: {avg_mae}")
-            return avg_mae.item()
+                mean = torch.abs(preds - gts).mean()
+                assert mean == mean, "mean is NaN"  # for Nan
+                mae_dict[v_name] = mean
+            # 所有视频求平均
+            maE_videos_max = torch.mean(torch.tensor(list(mae_dict.values())))
+            print(F"maE_videos_max: {maE_videos_max}")
+            return maE_videos_max
 
     def Eval_fmeasure(self):
         print('eval[FMeasure]:{} dataset with {} method.'.format(self.dataset, self.method))
         beta2 = 0.3
-        avg_f, img_num = 0.0, 0.0
-
+        F_dict = dict()
         with torch.no_grad():
-            trans = transforms.Compose([transforms.ToTensor()])
-            for pred, gt in tqdm(self.loader):
-                if self.cuda:
-                    pred = trans(pred).cuda()
-                    gt = trans(gt).cuda()
-                else:
-                    pred = trans(pred)
-                    gt = trans(gt)
-                prec, recall = self._eval_pr(pred, gt, 255)
-                f_score = (1 + beta2) * prec * recall / (beta2 * prec + recall)
-                f_score[f_score != f_score] = 0  # for Nan
-                avg_f += f_score
-                img_num += 1.0
-                score = avg_f / img_num
-            return score.max().item()
+            for v_name, preds, gts in tqdm(self.loader):
+                preds = preds.cuda() if self.cuda else preds
+                gts = gts.cuda() if self.cuda else gts
+                f_score = 0
+                for pred, gt in zip(preds, gts):
+                    prec, recall = self._eval_pr(pred, gt, 255)
+                    f_score += (1 + beta2) * prec * recall / (beta2 * prec + recall)
+                    f_score[f_score != f_score] = 0  # for Nan
+                    assert (f_score == f_score).all()  # for Nan
+                f_score /= len(preds)
+                # 单个视频的F
+                F_dict[v_name] = f_score
+
+            # 所有视频的
+            F_videos = torch.stack(list(F_dict.values())).mean(dim=0)
+            F_videos_max = F_videos.max()
+            
+            print(f'F_videos_max:{F_videos_max}')
+            return F_videos_max
 
     def Eval_Emeasure(self):
         print('eval[EMeasure]:{} dataset with {} method.'.format(self.dataset, self.method))
-        avg_e, img_num = 0.0, 0.0
+        E_dict = dict()
         with torch.no_grad():
-            trans = transforms.Compose([transforms.ToTensor()])
-            scores = torch.zeros(255)
-            if self.cuda:
-                scores = scores.cuda()
-            for pred, gt in tqdm(self.loader):
-                if self.cuda:
-                    pred = trans(pred).cuda()
-                    gt = trans(gt).cuda()
-                else:
-                    pred = trans(pred)
-                    gt = trans(gt)
-                scores += self._eval_e(pred, gt, 255)
-                img_num += 1.0
+            for v_name, preds, gts in tqdm(self.loader):
+                e_score = torch.zeros(255).cuda() if self.cuda else torch.zeros(255)
+                preds = preds.cuda() if self.cuda else preds
+                gts = gts.cuda() if self.cuda else gts
+                for pred, gt in zip(preds, gts):
+                    e_score += self._eval_e(pred, gt, 255)
+                e_score /= len(preds)
+                # 单个视频的E
+                E_dict[v_name] = e_score
 
-            scores /= img_num
-            return scores.max().item()
+            # 所有视频的
+            E_videos = torch.stack(list(E_dict.values())).mean(dim=0)
+            E_videos_max = E_videos.max()
+            print(f'E_videos_max:{E_videos_max}')
+            return E_videos_max
 
     def Eval_Smeasure(self):
         print('eval[SMeasure]:{} dataset with {} method.'.format(self.dataset, self.method))
-        alpha, avg_q, img_num = 0.5, 0.0, 0.0
+        alpha = 0.5
+        S_dict = dict()
         with torch.no_grad():
-            trans = transforms.Compose([transforms.ToTensor()])
-            for pred, gt in tqdm(self.loader):
-                if self.cuda:
-                    pred = trans(pred).cuda()
-                    gt = trans(gt).cuda()
-                else:
-                    pred = trans(pred)
-                    gt = trans(gt)
-                y = gt.mean()
-                if y == 0:
-                    x = pred.mean()
-                    Q = 1.0 - x
-                elif y == 1:
-                    x = pred.mean()
-                    Q = x
-                else:
+            for v_name, preds, gts in tqdm(self.loader):
+                preds = preds.cuda() if self.cuda else preds
+                gts = gts.cuda() if self.cuda else gts
+                sum_Q = 0
+                for pred, gt in zip(preds, gts):
                     gt[gt >= 0.5] = 1
                     gt[gt < 0.5] = 0
-                    # print(self._S_object(pred, gt), self._S_region(pred, gt))
                     Q = alpha * self._S_object(pred, gt) + (1 - alpha) * self._S_region(pred, gt)
-                    if Q.item() < 0:
-                        Q = torch.FloatTensor([0.0])
-                img_num += 1.0
-                avg_q += Q.item()
-            avg_q /= img_num
-            return avg_q
+                    sum_Q += Q
+
+                # 单个视频的S
+                S_video = sum_Q / len(preds)
+                S_dict[v_name] = S_video
+            # 所有视频的
+            S_videos_mean = torch.mean(torch.tensor(list(S_dict.values())))
+            return S_videos_mean
 
     def LOG(self, output):
         mode = 'a+' if os.path.exists(self.logfile) else 'w'
