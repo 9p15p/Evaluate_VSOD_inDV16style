@@ -30,7 +30,8 @@ class Eval_thread():
 
     def Eval_mae(self):
         print('eval[MAE]:{} dataset with {} method.'.format(self.dataset, self.method))
-        avg_mae, img_num = 0.0, 0.0
+        avg_mae = 0.0
+        img_num = 0
         with torch.no_grad():
             trans = transforms.Compose([transforms.ToTensor()])
             for pred, gt in tqdm(self.loader):
@@ -43,8 +44,12 @@ class Eval_thread():
                 mea = torch.abs(pred - gt).mean()
                 if mea == mea:  # for Nan
                     avg_mae += mea
-                    img_num += 1.0
+                    img_num += 1
+                else:
+                    raise "mea is NaN"
+
             avg_mae /= img_num
+            print(F"avg_mae: {avg_mae}")
             return avg_mae.item()
 
     def Eval_fmeasure(self):

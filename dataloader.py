@@ -32,7 +32,7 @@ class EvalDataset(data.Dataset):
         for v in v_lst:
             if 'pred' in root:
                 f_lst.extend(
-                    sorted([os.path.join(v, f) for f in os.listdir(v)])[1:]  # 光流method一般保留第一帧，这里去掉第一帧
+                    sorted([os.path.join(v, f) for f in os.listdir(v)])[1:-1]  # 光流method一般保留第一帧，这里去掉第一帧
                 )
 
             elif 'gt' in root:
@@ -49,11 +49,11 @@ class EvalDataset(data.Dataset):
     def __getitem__(self, item):
         pred = Image.open(self.image_path[item]).convert('L')
         gt = Image.open(self.label_path[item]).convert('L')
-        if pred.size != gt.size:
-            pred = pred.resize(gt.size, Image.BILINEAR)
-        pred_np = np.array(pred)
-        pred_np = ((pred_np - pred_np.min()) / (pred_np.max() - pred_np.min()) * 255).astype(np.uint8)
-        pred = Image.fromarray(pred_np)
+        # if pred.size != gt.size:
+        #     pred = pred.resize(gt.size, Image.BILINEAR)
+        # pred_np = np.array(pred)
+        # pred_np = ((pred_np - pred_np.min()) / (pred_np.max() - pred_np.min()) * 255).astype(np.uint8)
+        # pred = Image.fromarray(pred_np)
 
         return pred, gt
 
