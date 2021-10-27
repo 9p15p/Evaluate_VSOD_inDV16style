@@ -40,7 +40,7 @@ class Eval_thread():
                 assert mean == mean, "mean is NaN"  # for Nan
                 mae_dict[v_name] = mean
             # 所有视频求平均
-            maE_videos_max = torch.mean(torch.tensor(list(mae_dict.values())))
+            maE_videos_max = torch.mean(torch.tensor(list(mae_dict.values()))).item()
             print(F"maE_videos_max: {maE_videos_max}")
             return maE_videos_max
 
@@ -55,8 +55,7 @@ class Eval_thread():
                 f_score = 0
                 for pred, gt in zip(preds, gts):
                     prec, recall = self._eval_pr(pred, gt, 255)
-                    f_score += (1 + beta2) * prec * recall / (beta2 * prec + recall)
-                    f_score[f_score != f_score] = 0  # for Nan
+                    f_score += (1 + beta2) * prec * recall / (beta2 * prec + recall+1e-10)
                     assert (f_score == f_score).all()  # for Nan
                 f_score /= len(preds)
                 # 单个视频的F
@@ -64,8 +63,8 @@ class Eval_thread():
 
             # 所有视频的
             F_videos = torch.stack(list(F_dict.values())).mean(dim=0)
-            F_videos_max = F_videos.max()
-            
+            F_videos_max = F_videos.max().item()
+
             print(f'F_videos_max:{F_videos_max}')
             return F_videos_max
 
@@ -85,7 +84,7 @@ class Eval_thread():
 
             # 所有视频的
             E_videos = torch.stack(list(E_dict.values())).mean(dim=0)
-            E_videos_max = E_videos.max()
+            E_videos_max = E_videos.max().item()
             print(f'E_videos_max:{E_videos_max}')
             return E_videos_max
 
@@ -99,16 +98,27 @@ class Eval_thread():
                 gts = gts.cuda() if self.cuda else gts
                 sum_Q = 0
                 for pred, gt in zip(preds, gts):
-                    gt[gt >= 0.5] = 1
-                    gt[gt < 0.5] = 0
-                    Q = alpha * self._S_object(pred, gt) + (1 - alpha) * self._S_region(pred, gt)
+                    y = gt.mean()
+                    if y == 0:
+                        x = pred.mean()
+                        Q = 1.0 - x
+                    elif y == 1:
+                        x = pred.mean()
+                        Q = x
+                    else:
+                        gt[gt >= 0.5] = 1
+                        gt[gt < 0.5] = 0
+                        Q = alpha * self._S_object(pred, gt) + (1 - alpha) * self._S_region(pred, gt)
+                        if Q.item() < 0:
+                            Q = torch.FloatTensor([0.0])
+                    assert Q==Q,'Q is NaN'
                     sum_Q += Q
 
                 # 单个视频的S
                 S_video = sum_Q / len(preds)
                 S_dict[v_name] = S_video
             # 所有视频的
-            S_videos_mean = torch.mean(torch.tensor(list(S_dict.values())))
+            S_videos_mean = torch.mean(torch.tensor(list(S_dict.values()))).item()
             return S_videos_mean
 
     def LOG(self, output):
