@@ -39,5 +39,6 @@ if __name__ == "__main__":
     parser.add_argument('--log_dir', type=str, default='./', help='保存log的位置')
     parser.add_argument('--cuda', type=bool, default=True)
     parser.add_argument('--use_flow', type=bool, default=False,help="如果使用光流则在最后一帧GT上不eval【具体调整见dataloader】")
+
     config = parser.parse_args()
     main(config)
