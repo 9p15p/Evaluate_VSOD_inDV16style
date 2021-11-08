@@ -1,5 +1,5 @@
-import torch
-import torch.nn as nn
+# -*- coding: UTF-8 -*-
+
 import argparse
 import os.path as osp
 import os

@@ -41,7 +41,7 @@ class Eval_thread():
                 mae_dict[v_name] = mean
             # 所有视频求平均
             maE_videos_max = torch.mean(torch.tensor(list(mae_dict.values()))).item()
-            print(F"maE_videos_max: {maE_videos_max}")
+            print(f'maE_videos_max: {maE_videos_max}')
             return maE_videos_max
 
     def Eval_fmeasure(self):
@@ -55,7 +55,7 @@ class Eval_thread():
                 f_score = 0
                 for pred, gt in zip(preds, gts):
                     prec, recall = self._eval_pr(pred, gt, 255)
-                    f_score += (1 + beta2) * prec * recall / (beta2 * prec + recall+1e-10)
+                    f_score += (1 + beta2) * prec * recall / (beta2 * prec + recall + 1e-10)
                     assert (f_score == f_score).all()  # for Nan
                 f_score /= len(preds)
                 # 单个视频的F
@@ -111,7 +111,7 @@ class Eval_thread():
                         Q = alpha * self._S_object(pred, gt) + (1 - alpha) * self._S_region(pred, gt)
                         if Q.item() < 0:
                             Q = torch.FloatTensor([0.0])
-                    assert Q==Q,'Q is NaN'
+                    assert Q == Q, 'Q is NaN'
                     sum_Q += Q
 
                 # 单个视频的S
@@ -119,6 +119,7 @@ class Eval_thread():
                 S_dict[v_name] = S_video
             # 所有视频的
             S_videos_mean = torch.mean(torch.tensor(list(S_dict.values()))).item()
+            print(f'S_videos_mean: {S_videos_mean}')
             return S_videos_mean
 
     def LOG(self, output):
