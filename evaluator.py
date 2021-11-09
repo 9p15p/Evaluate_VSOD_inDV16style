@@ -14,6 +14,8 @@ class Eval_thread():
         self.method = method
         self.dataset = dataset
         self.cuda = cuda
+        print(output_dir)
+        print(f'{dataset}.csv')
         self.logfile = os.path.join(output_dir, f'{dataset}.csv')
 
     def run(self):
@@ -94,12 +96,13 @@ class Eval_thread():
         S_dict = dict()
         with torch.no_grad():
             for v_name, preds, gts in tqdm(self.loader):
+                # if v_name!='Car': continue
                 preds = preds.cuda() if self.cuda else preds
                 gts = gts.cuda() if self.cuda else gts
                 sum_Q = 0
                 for pred, gt in zip(preds, gts):
                     y = gt.mean()
-                    if y == 0:
+                    if y <1e-4: #太小了默认无,后面过不了S_region #== 0:
                         x = pred.mean()
                         Q = 1.0 - x
                     elif y == 1:

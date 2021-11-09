@@ -8,7 +8,7 @@ from dataloader import EvalDataset
 
 
 # from concurrent.futures import ThreadPoolExecutor
-def main(cfg):
+def Eval_VSOD(cfg):
     if cfg.methods is None:
         method_names = os.listdir(cfg.pred_dir)
     else:
@@ -41,4 +41,4 @@ if __name__ == "__main__":
     parser.add_argument('--use_flow', type=bool, default=False,help="如果使用光流则在最后一帧GT上不eval【具体调整见dataloader】")
 
     config = parser.parse_args()
-    main(config)
+    Eval_VSOD(config)
