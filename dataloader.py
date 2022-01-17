@@ -4,6 +4,8 @@ import os
 from PIL import Image
 import numpy as np
 from torchvision import transforms
+# import time
+# from tqdm import tqdm
 
 class EvalDataset(data.Dataset):
     def __init__(self, img_root, label_root, use_flow):
@@ -33,36 +35,29 @@ class EvalDataset(data.Dataset):
         f_lst = {}
         for v in v_lst:
             v_name = v.split('/')[-1]
-            if 'pred' in root:
-                f_lst[v_name] = sorted([os.path.join(v, f) for f in os.listdir(v)])[1:]  # 光流method一般保留第一帧，这里去掉第一帧
+            if 'result' in root:
+                if not self.use_flow:
+                    f_lst[v_name] = sorted([os.path.join(v, f) for f in os.listdir(v)])[1:]
+                elif self.use_flow:
+                    f_lst[v_name] = sorted([os.path.join(v, f) for f in os.listdir(v)])[1:-1]  # 光流方法忽略第一帧和最后一帧
 
             elif 'gt' in root:
                 if not self.use_flow:
                     f_lst[v_name] = sorted([os.path.join(v, f) for f in os.listdir(v)])[1:]
                 elif self.use_flow:
-                    f_lst[v_name] = sorted([os.path.join(v, f) for f in os.listdir(v)])[1:-1]  # 光流对比，去掉第一帧和最后一帧
+                    f_lst[v_name] = sorted([os.path.join(v, f) for f in os.listdir(v)])[1:-1]  # 光流方法忽略第一帧和最后一帧
         return f_lst
 
     def read_picts(self, v_name):
+        pred_names = self.image_path[v_name]
+        pred_list = []
+        for pred_n in pred_names:
+            pred_list.append(self.trans(Image.open(pred_n).convert('L')))
 
         gt_names = self.label_path[v_name]
         gt_list = []
         for gt_n in gt_names:
             gt_list.append(self.trans(Image.open(gt_n).convert('L')))
-
-        # # 直接读取,MCL不行,MCL的preds会比gt多
-        # pred_names = self.image_path[v_name]
-        # pred_list = []
-        # for pred_n in pred_names:
-        #     pred_list.append(self.trans(Image.open(pred_n).convert('L')))
-
-        # 利用gt转换而来
-        pred_list = []
-        method_n = self.image_path[v_name][0].split('/')[-4]
-        for pred_n in gt_names:
-            pred_n = pred_n.replace('/gt/',f'/pred/{method_n}/')
-            pred_list.append(self.trans(Image.open(pred_n).convert('L')))
-
 
         for gt, pred in zip(gt_list, pred_list):
             assert gt.shape == pred.shape, 'gt.shape!=pred.shape'
@@ -79,3 +74,24 @@ class EvalDataset(data.Dataset):
 
     def __len__(self):
         return len(self.image_path)
+
+# if __name__ == '__main__':
+#     img_root = '../result/fsnet/DAVIS/'
+#     label_root = '../../dataset/gt/DAVIS/'
+#     use_flow = False
+#     dataset = EvalDataset(img_root, label_root, use_flow)
+#     time1 = time.time()
+#     for v_name, preds, gts in tqdm(dataset):
+#         pass
+#     time2 = time.time()
+#     data_loader = data.DataLoader(dataset=dataset,
+#                                   batch_size=1,
+#                                   shuffle=False,
+#                                   num_workers=12,
+#                                   pin_memory=True,
+#                                   drop_last=False)
+#     for i, batch in enumerate(data_loader): 
+#         pass
+#     time3 = time.time()
+#     print('tqdm', time2-time1)
+#     print('dataloader', time3-time2)

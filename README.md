@@ -1,16 +1,34 @@
-## Evaluation on saliency object detection(Evaluate SOD)
+## Evaluation on video saliency object detection (Evaluate VSOD)
+
 ---
-A **One-key** fast evaluation on saliency object detection with GPU implementation including **MAE, Max F-measure, S-measure, E-measure**.
+A **One-key** fast evaluation on video saliency object detection with GPU implementation including **MAE, Max F-measure, S-measure, Max E-measure**.
 
 Code are reimplemented from the matlab version which are available from http://dpfan.net/
 
 * GPU implementation with pytorch which can be easier embedding into eval code.
 * One-key evaluation
+* **Speed up Max F-measure and Max E-measure (Update!!!)**
+* **Optimize data loading method (Update!!!)**
+* **Fix some bugs (Update!!!)**
 
+### **Speed comparison before and after update：**
+
+* Before update, DAVIS:
+
+![](./images/Before_DAVIS.png)
+
+* Before update, FBMS:
+
+![](./images/Before_FBMS.png)
+
+* After update, DAVIS FBMS
+
+![](./images/After_DAVIS_FBMS.png)
 
 **example:**
-```
-python main.py --method LWL4vsod --dataset 'DAVIS2016 DAVSOD' --gt_dir ./gt --pred_dir ./pred --log_dir./
+
+```bash
+./val.sh
 ```
 example root_dir:
 ```
@@ -24,7 +42,7 @@ example root_dir:
 │   │   ├── select_0001
 │   │   │   ├── 0001.png
 │   │   │   └── 0002.png
-└── pred
+└── result
 │   └── LWL4vsod
 │   │   ├── DAVIS2016
 │   │   │   ├── bear
