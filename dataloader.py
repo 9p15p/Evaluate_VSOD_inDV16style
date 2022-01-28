@@ -8,26 +8,26 @@ from torchvision import transforms
 # from tqdm import tqdm
 
 class EvalDataset(data.Dataset):
-    def __init__(self, img_root, label_root, use_flow):
+    def __init__(self, pred_root, label_root, use_flow):
         self.use_flow = use_flow
         lst_label = sorted(os.listdir(label_root))
-        lst_pred = sorted(os.listdir(img_root))
+        lst_pred = sorted(os.listdir(pred_root))
         lst = []
         for name in lst_label:
             if name in lst_pred:
                 lst.append(name)
-        self.image_path = self.get_paths(lst, img_root)
+        self.pred_path = self.get_paths(lst, pred_root)
         self.label_path = self.get_paths(lst, label_root)
-        self.key_list = list(self.image_path.keys())
+        self.key_list = list(self.pred_path.keys())
 
-        self.check_path(self.image_path, self.label_path)
+        self.check_path(self.pred_path, self.label_path)
         self.trans = transforms.Compose([transforms.ToTensor()])
 
 
-    def check_path(self, image_path_dict, label_path_dict):
-        assert image_path_dict.keys() == label_path_dict.keys(), 'gt, pred must have the same videos'
-        for k in image_path_dict.keys():
-            assert len(image_path_dict[k]) == len(image_path_dict[k]), f'{k} have different frames'
+    def check_path(self, pred_path_dict, label_path_dict):
+        assert pred_path_dict.keys() == label_path_dict.keys(), 'gt, pred must have the same videos'
+        for k in pred_path_dict.keys():
+            assert len(pred_path_dict[k]) == len(label_path_dict[k]), f'{k} have different frames'
 
     def get_paths(self, lst, root):
         v_lst = list(map(lambda x: os.path.join(root, x), lst))
@@ -35,11 +35,8 @@ class EvalDataset(data.Dataset):
         f_lst = {}
         for v in v_lst:
             v_name = v.split('/')[-1]
-            if 'result' in root:
-                if not self.use_flow:
-                    f_lst[v_name] = sorted([os.path.join(v, f) for f in os.listdir(v)])[1:]
-                elif self.use_flow:
-                    f_lst[v_name] = sorted([os.path.join(v, f) for f in os.listdir(v)])[1:-1]  # 光流方法忽略第一帧和最后一帧
+            if 'pred' in root:
+                f_lst[v_name] = sorted([os.path.join(v, f) for f in os.listdir(v)])[1:]
 
             elif 'gt' in root:
                 if not self.use_flow:
@@ -49,7 +46,7 @@ class EvalDataset(data.Dataset):
         return f_lst
 
     def read_picts(self, v_name):
-        pred_names = self.image_path[v_name]
+        pred_names = self.pred_path[v_name]
         pred_list = []
         for pred_n in pred_names:
             pred_list.append(self.trans(Image.open(pred_n).convert('L')))
@@ -73,7 +70,7 @@ class EvalDataset(data.Dataset):
         return v_name, preds, gts
 
     def __len__(self):
-        return len(self.image_path)
+        return len(self.pred_path)
 
 # if __name__ == '__main__':
 #     img_root = '../result/fsnet/DAVIS/'

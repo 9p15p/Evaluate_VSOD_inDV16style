@@ -5,12 +5,18 @@ import numpy as np
 import torch
 from torchvision import transforms
 from tqdm import tqdm
+import csv
+
 
 class Eval_thread():
-    def __init__(self, loader, method, dataset):
+    def __init__(self, loader, method, dataset, log_dir):
         self.loader = loader
         self.method = method
         self.dataset = dataset
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        self.logfile = os.path.join(log_dir, f'{dataset}.csv')
+        print(self.logfile)
 
     def run(self):
         print('eval: {} dataset with {} method.'.format(self.dataset, self.method))
@@ -40,7 +46,7 @@ class Eval_thread():
                 for pred, gt in zip(preds, gts):
                     # F-Measure
                     prec, recall = self._eval_pr(pred, gt, 256)
-                    f_score += (1 + beta2) * prec * recall / (beta2 * prec + recall+1e-10)
+                    f_score += (1 + beta2) * prec * recall / (beta2 * prec + recall + 1e-10)
                     assert (f_score == f_score).all()  # for Nan
                     # E-Measure
                     e_score += self._eval_e(pred, gt, 256)
@@ -58,7 +64,7 @@ class Eval_thread():
                         Q = alpha * self._S_object(pred, gt) + (1 - alpha) * self._S_region(pred, gt)
                         if Q.item() < 0:
                             Q = torch.FloatTensor([0.0])
-                    assert Q==Q,'Q is NaN'
+                    assert Q == Q, 'Q is NaN'
                     sum_Q += Q
 
                 # F-Measure
@@ -71,7 +77,7 @@ class Eval_thread():
                 S_video = sum_Q / len(preds)
                 S_dict[v_name] = S_video
             # MAE
-            MAE_videos_max = torch.mean(torch.tensor(list(mae_dict.values()))).item()
+            MAE_videos_mean = torch.mean(torch.tensor(list(mae_dict.values()))).item()
             # Max F-Measure
             F_videos = torch.stack(list(F_dict.values())).mean(dim=0)
             F_videos_max = F_videos.max().item()
@@ -81,21 +87,41 @@ class Eval_thread():
             # S-Measure
             S_videos_mean = torch.mean(torch.tensor(list(S_dict.values()))).item()
 
-            return '[cost:{:.2f}s] {} dataset with {} method get {:.3f} MAE, {:.3f} max F-measure, {:.3f} max E-measure, {:.3f} S-measure..'.format(
-                time.time() - start_time, self.dataset, self.method, MAE_videos_max, F_videos_max, E_videos_max, S_videos_mean)
+            output_dict = {
+                'Method':self.method,
+                'S': S_videos_mean,
+                'E_max': E_videos_max,
+                'F_max': F_videos_max,
+                'MAE': MAE_videos_mean,
+            }
+            self.LOG(output_dict)
+
+            return '[cost:{:.2f}s] {} dataset with {} method get S-measure:{:.3f}, max-E-measure:{:.3f}, max-F-measure:{:.3f}, MAE:{:.3f}'.format(
+                time.time() - start_time, self.dataset, self.method,
+                S_videos_mean, E_videos_max, F_videos_max, MAE_videos_mean)
+
+    def LOG(self, output):
+        mode = 'a+' if os.path.exists(self.logfile) else 'w'
+        headers = output.keys()
+        with open(self.logfile, mode, encoding='utf-8', newline='') as f:
+            writer = csv.DictWriter(f, headers)
+            if mode == 'w':
+                writer.writeheader()
+            writer.writerow(output)
 
     def _eval_e(self, y_pred, y, num):
         h, w = y.shape
         pred = y_pred.expand(num, h, w)
         gt = y.expand(num, h, w)
         thlist = torch.linspace(0, 1 - 1e-10, num).cuda().reshape(num, 1)
-        mask = thlist.expand(num, h*w).reshape(num, h, w)
+        mask = thlist.expand(num, h * w).reshape(num, h, w)
         pred_threshold = torch.where(pred >= mask, 1, 0).float()
-        fm = pred_threshold - torch.mean(pred_threshold, dim=(1,2)).reshape(num, 1).expand(num, h*w).reshape(num, h, w)
-        gt = gt - torch.mean(gt, dim=(1,2)).reshape(num, 1).expand(num, h*w).reshape(num, h, w)
+        fm = pred_threshold - torch.mean(pred_threshold, dim=(1, 2)).reshape(num, 1).expand(num, h * w).reshape(num, h,
+                                                                                                                w)
+        gt = gt - torch.mean(gt, dim=(1, 2)).reshape(num, 1).expand(num, h * w).reshape(num, h, w)
         align_matrix = 2 * gt * fm / (gt * gt + fm * fm + 1e-20)
         enhanced = ((align_matrix + 1) * (align_matrix + 1)) / 4
-        score = torch.sum(enhanced, dim=(1,2)) / (y.numel() - 1 + 1e-20)
+        score = torch.sum(enhanced, dim=(1, 2)) / (y.numel() - 1 + 1e-20)
         return score
 
     def _eval_pr(self, y_pred, y, num):
@@ -103,10 +129,10 @@ class Eval_thread():
         pred = y_pred.expand(num, h, w)
         gt = y.expand(num, h, w)
         thlist = torch.linspace(0, 1 - 1e-10, num).cuda().reshape(num, 1)
-        mask = thlist.expand(num, h*w).reshape(num, h, w)
+        mask = thlist.expand(num, h * w).reshape(num, h, w)
         pred_threshold = torch.where(pred >= mask, 1, 0).float()
-        tp = torch.sum(pred_threshold * gt, dim=(1,2))
-        prec, recall = tp / (torch.sum(pred_threshold, dim=(1,2)) + 1e-20), tp / (torch.sum(gt, dim=(1,2)) + 1e-20)
+        tp = torch.sum(pred_threshold * gt, dim=(1, 2))
+        prec, recall = tp / (torch.sum(pred_threshold, dim=(1, 2)) + 1e-20), tp / (torch.sum(gt, dim=(1, 2)) + 1e-20)
         return prec, recall
 
     def _S_object(self, pred, gt):
@@ -197,4 +223,3 @@ class Eval_thread():
         else:
             Q = 0
         return Q
-
